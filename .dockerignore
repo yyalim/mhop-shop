@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+generated
+.env*
+npm-debug.log*
+README.md
+docker-compose.yml
+Dockerfile

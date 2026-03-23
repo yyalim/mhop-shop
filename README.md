@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Shop
 
-## Getting Started
+Next.js 16.2 e-commerce app — App Router, Prisma 6, Neon/PostgreSQL, scratch-built session auth (AES-GCM cookies, no auth library).
 
-First, run the development server:
+## Stack
+
+- **Next.js 16.2** — App Router, Turbopack
+- **Prisma 6** — ORM with migration tracking
+- **PostgreSQL** — local via Docker Compose, production via Neon
+- **Tailwind CSS**
+- **bcryptjs** — password hashing
+- **Web Crypto API** — AES-GCM session encryption
+
+## Environment Variables
+
+Create a `.env.local` file in the project root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Generate with: openssl rand -hex 32
+SESSION_SECRET=
+
+# Local (Docker):
+DATABASE_URL=postgresql://shop:shop@localhost:5432/shop?sslmode=disable
+
+# Neon (production):
+# DATABASE_URL=postgres://...neon.tech/...?sslmode=require
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local Development (Docker)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### First-time setup
 
-## Learn More
+```bash
+# 1. Start the database
+docker compose up -d db
 
-To learn more about Next.js, take a look at the following resources:
+# 2. Generate migration files and apply them
+npx prisma migrate dev --name init
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# 3. Start the full stack
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Subsequent runs
 
-## Deploy on Vercel
+```bash
+docker compose up -d db
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Schema changes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# Edit prisma/schema.prisma, then:
+npx prisma migrate dev --name <description>
+```
+
+---
+
+## Docker (fully containerised)
+
+> **Important:** migration files must exist before running the full stack.
+> If `prisma/migrations/` is empty, complete the first-time setup above first.
+
+```bash
+# Build and start everything (db + migrate + app)
+docker compose up --build
+
+# Tear down and wipe the database volume
+docker compose down -v
+```
+
+Services:
+
+| Service   | Description                                              |
+|-----------|----------------------------------------------------------|
+| `db`      | Postgres 16 — exposed on `localhost:5432`                |
+| `migrate` | Runs `prisma migrate deploy` on startup, then exits      |
+| `app`     | Next.js production server — exposed on `localhost:3000`  |
+
+`migrate` runs before `app` and only starts after `db` passes its healthcheck.
+
+---
+
+## Migration workflow
+
+| Situation | Command |
+|---|---|
+| First-time / new clone | `npx prisma migrate dev --name init` |
+| New schema change | `npx prisma migrate dev --name <description>` |
+| Check pending migrations | `npx prisma migrate status` |
+| Production / containers | `prisma migrate deploy` (runs automatically via Docker) |
+
+Migration SQL files live in `prisma/migrations/` and are committed to git so every environment applies the same ordered history.
+
+---
+
+## Routes
+
+| Route | Description |
+|---|---|
+| `/` | Home — greets logged-in user |
+| `/register` | Create account |
+| `/login` | Sign in |
+| `/basket` | Protected — redirects to `/login` if no session |
+| `/checkout` | Protected |
+| `/orders` | Protected |
