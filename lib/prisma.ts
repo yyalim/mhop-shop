@@ -1,17 +1,17 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaNeon } from '@prisma/adapter-neon'
-import { neonConfig } from '@neondatabase/serverless'
+import { PrismaNeonHttp } from '@prisma/adapter-neon'
 
 const isNeon = process.env.DATABASE_URL?.includes('neon.tech')
 
 function createClient(): PrismaClient {
   if (isNeon) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    neonConfig.webSocketConstructor = require('ws')
-    const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
+    // Use Neon's HTTP transport — no WebSocket / ws package needed,
+    // works reliably in Vercel serverless and edge runtimes.
+    const adapter = new PrismaNeonHttp(process.env.DATABASE_URL!, {})
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return new PrismaClient({ adapter } as any)
   }
+  // Local Docker — standard TCP connection, no adapter needed.
   return new PrismaClient()
 }
 
